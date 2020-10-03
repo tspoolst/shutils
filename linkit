@@ -11,6 +11,7 @@ shopt -s extglob
 function fn_recurse_base {
   for i in `ls -A ${v_srcdir}` ; do
     current="$i"
+    [[ -d "${v_srcdir}/${current}" && "${current}" == ".git" ]] && continue
     if [[ -d "${v_srcdir}/${current}" ]] ; then
       if [[ -L "${v_srcdir}/${current}" ]] ; then
         if [[ ! -e "${v_dstdir}/${current}" ]] ; then
@@ -33,6 +34,7 @@ function fn_recurse_base {
 function fn_recurse_loop {
   for i in `ls -A ${v_srcdir}/${current}` ; do
     current="${current}/$i"
+    [[ -d "${v_srcdir}/${current}" && "${current##*/}" == ".git" ]] && continue
     if [[ -d "${v_srcdir}/${current}" && ! -L "${v_srcdir}/${current}" ]] ; then
 #[of]:      create dir
       if [[ ! -e "${v_dstdir}/${current}" ]] ; then
@@ -73,7 +75,7 @@ function fn_recurse_loop {
                 cp -a "${v_srcdir}/${current}" "${v_dstdir}/${current}"
               else
 #[c]                echo ln1
-                ln -sf "${v_srcdir#${prefix}}/${current}" "${v_dstdir}/${current}"
+                ln -sv "${v_srcdir#${prefix}}/${current}" "${v_dstdir}/${current}"
               fi
             fi
           fi
@@ -85,7 +87,7 @@ function fn_recurse_loop {
             cp -a "${v_srcdir}/${current}" "${v_dstdir}/${current}"
           else
 #[c]            echo ln2
-            ln -sf "${v_srcdir#${prefix}}/${current}" "${v_dstdir}/${current}"
+            ln -sv "${v_srcdir#${prefix}}/${current}" "${v_dstdir}/${current}"
           fi
         fi
       fi

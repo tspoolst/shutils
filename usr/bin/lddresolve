@@ -1,0 +1,37 @@
+#!/bin/bash
+
+if [[ "$(pwd)" = "/" || "$(pwd)" = "/usr" ]] ; then
+  echo "refusing to run from / or /usr"
+  exit 1
+fi
+
+if [[ ! -d "lib" ]] ; then
+  echo "must be ran at the base of your chroot"
+  exit 1
+fi
+
+
+libcount="$(ls -l lib/ | grep -vc -e ^total -e ^d -e ^l )"
+unset lastlibcount
+
+for i in ld-linux.so.2 libnss_compat.so.2 libnss_dns.so.2 libnss_files.so.2 ; do
+  [[ ! -e "lib/${i}" ]] && cp $(readlink -f /lib/${i}) lib/
+done
+
+while [[ "${libcount}" != "${lastlibcount}" ]]
+do
+  for i in $(
+    ldd {{,usr/}{,s}bin,lib}/* "$@" 2>/dev/null | \
+      grep = | (
+        while read a b c d ; do
+          [[ -z "${c##*/*}" ]] && echo "${c}"
+        done) | sort -u
+      )
+  do
+    [[ ! -f lib/${i##*/} ]] && cp $(readlink -f ${i}) lib/
+  done
+  lastlibcount="${libcount}"
+  libcount="$(ls -l lib/ | grep -vc -e ^total -e ^d -e ^l )"
+  echo before $lastlibcount and after $libcount
+done
+ldconfig -r .

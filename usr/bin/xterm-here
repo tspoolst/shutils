@@ -1,0 +1,5 @@
+#!/bin/bash
+
+if [[ -d "$@" ]] ; then
+  cd "$@" && exec urxvt -tn rxvt -tr -sh 20 -g 80x24 -bg black -cr green -fg white -C -fn 7x14 -sl 5000 -e bash
+fi

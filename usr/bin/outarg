@@ -1,0 +1,7 @@
+#!/bin/bash
+
+v_position=$(( $1 - 1 ))
+[[ ${v_position} -lt 0 ]] && v_position=0
+while read -ra i ; do
+  eval echo \"\${i[${v_position}]$2}\"
+done

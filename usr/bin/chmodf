@@ -1,0 +1,11 @@
+#!/bin/bash
+
+#set -xv
+
+#take input and only chmod files
+_perms="$1"
+shift
+
+for _arg ; do
+  find ${_arg} -type f -exec chmod ${_perms} {} -c \;
+done

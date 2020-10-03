@@ -1,0 +1,51 @@
+#!/bin/bash
+#ver 051205
+
+search_base="./"
+
+while [ -n "$1" ] ; do
+  case "$1" in
+    "-?" | "--help")
+      echo "some help is always nice, but for now read the code."
+      ;;
+    "-x")
+      extra_ops="-xdev"
+      ;;
+    "-f")
+      shift
+      if [ -z "$1" ] ; then
+        echo "-f must be followed by a filter keyword"
+        exit 1
+      else
+        echo "grep filtering not enabled yet"
+        exit 1
+      fi
+      ;;
+    -e)
+      echo "exec switch not supported yes"
+      exit 1
+      ;;
+    -*)
+      echo "the \"$1\" argment is not implemented yet."
+      exit 1
+      ;;
+    *)
+      search_arg="${search_arg}${search_arg:+ }$1"
+      ;;
+  esac
+  shift
+done
+if [ -z "$search_arg" ] ; then
+  echo "what, you're not looking for anything?"
+else
+  for arg in $search_arg
+  do
+    if [[ -d "${arg}" ]] ; then
+      search_base="${arg}"
+      continue
+    fi
+    find ${search_base} ${extra_ops} -iname "*${arg}*" 2>/dev/null
+  done
+fi
+
+exit 0

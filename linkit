@@ -1,0 +1,220 @@
+#!/bin/bash
+
+#[of]:comments
+#[c]read top level entry from cmdline
+#[c]
+#[c]
+#[cf]
+#[of]:functions
+shopt -s extglob
+#[of]:function fn_recurse_base
+function fn_recurse_base {
+  for i in `ls -A ${v_srcdir}` ; do
+    current="$i"
+    if [[ -d "${v_srcdir}/${current}" ]] ; then
+      if [[ -L "${v_srcdir}/${current}" ]] ; then
+        if [[ ! -e "${v_dstdir}/${current}" ]] ; then
+          cp -a "${v_srcdir}/${current}" "${v_dstdir}/${current}" || exit 1
+        fi
+      else
+        if [[ ! -e "${v_dstdir}/${current}" ]] ; then
+          #echo "making directory ${v_dstdir}/${current}"
+          # if file	exist and is not a directory this	fails
+          mkdir -p "${v_dstdir}/${current}" || exit 1
+        fi
+        fn_recurse_loop
+      fi
+    fi
+    #		current=""
+  done
+}
+#[cf]
+#[of]:function fn_recurse_loop
+function fn_recurse_loop {
+  for i in `ls -A ${v_srcdir}/${current}` ; do
+    current="${current}/$i"
+    if [[ -d "${v_srcdir}/${current}" && ! -L "${v_srcdir}/${current}" ]] ; then
+#[of]:      create dir
+      if [[ ! -e "${v_dstdir}/${current}" ]] ; then
+        #echo "making directory ${v_dstdir}/${current}"
+        if ! mkdir -p "${v_dstdir}/${current}" ; then
+          #echo "could not make directory"
+          exit 1
+        fi
+      fi
+      fn_recurse_loop
+#[cf]
+    else
+#[of]:      create link
+      #IFS=$'\n'
+#[c]if files exist and not etc and not force
+#[c] remove
+#[c] create new file
+#[c]else
+#[c] create new file
+      if  [[ -n "${current##*.wh.*}" ]] ; then
+        if [[ -e "${v_dstdir}/${current}" || -L "${v_dstdir}/${current}" ]] ; then
+#[c]file exist
+#[c]
+#[c]if src file is a link, ensure dst file is the exact same link
+#[c]if src file is not a link, ensure dst file points to the src file
+#[c]
+#echo "${prefix}$(readlink ${v_srcdir}/${current})" "${v_dstdir}/${current}"
+#exit
+          if ! { [[ -L "${v_srcdir#${prefix}}/${current}" && "$(readlink ${v_srcdir}/${current})" = "$(readlink ${v_dstdir}/${current})" ]] || 
+                [[ "${v_srcdir#${prefix}}/${current}" = "$(readlink ${v_dstdir}/${current})" ]]; } ; then
+            if [[ -n "${current##@(etc|home|users|boot)*}" ]] || ${gl_progargs_f:-false} ; then
+              ##if current dir is not etc|home or if force=true --- replace old link
+              #echo "---Warning: ${v_dstdir}/${current} --- exists and is not from this package"
+              #echo "link to ${v_srcdir}/${current}. Forcing link..."
+              rm -rf "${v_dstdir}/${current}"
+              if [[ -L "${v_srcdir}/${current}" ]] ; then
+#[c]                echo cp1
+                cp -a "${v_srcdir}/${current}" "${v_dstdir}/${current}"
+              else
+#[c]                echo ln1
+                ln -sf "${v_srcdir#${prefix}}/${current}" "${v_dstdir}/${current}"
+              fi
+            fi
+          fi
+        else
+          #echo "---Creating link ${v_dstdir}/${current}"
+          #echo "pointing to ${v_srcdir#${prefix}}/${current}"
+          if [[ -L "${v_srcdir}/${current}" ]] ; then
+#[c]            echo cp2
+            cp -a "${v_srcdir}/${current}" "${v_dstdir}/${current}"
+          else
+#[c]            echo ln2
+            ln -sf "${v_srcdir#${prefix}}/${current}" "${v_dstdir}/${current}"
+          fi
+        fi
+      fi
+#[cf]
+    fi
+    current="${current%/*}"
+  done
+}
+
+#[cf]
+#[cf]
+#[of]:main
+
+#set -xv
+
+#[of]:parse command line
+#[of]:description
+##process command line into gl_progargs format.  the actual command line is not touched.
+##
+##sample command line
+##  ./bod-ibt-e2i-processfiles-1.0.0.ksh -a -f part0 -c -d="once two" parta partb "part1 part2" -r=i=something
+##produces the following variables
+##    contains all arguments in on variable
+##      gl_progargs='-a -f part0 -c -d=once two parta partb part1 part2'
+##
+##    every switch found sets a variable named gl_progargs_{switchname} equal to "true"
+##      gl_progargs_a=true
+##    arguments not associated with a switch are placed in an array
+##      gl_progargs_array=([0]="part0" [1]="parta" [2]="partb" [3]="part1 part2")
+##      gl_progargs_c=true
+##      gl_progargs_d=true
+##
+##    data attached to a switch is stored in a variable name gl_progargs_{switchname}_data
+##      gl_progargs_d_data='once two'
+##
+##    the total count of arguments not associated with a switch
+##      gl_progargs_datacount=4
+##
+##      gl_progargs_f=true
+##      gl_progargs_r=true
+##      gl_progargs_r_data=i=something
+##    summary of all switches found
+##      gl_progargs_switchcount=5
+##      gl_progargs_switchlist='a f c d r'
+##
+##sample code
+##  if ${gl_progargs_a:-false} ; then
+##    echo "ask switch is set"
+##  else
+##    echo "ask switch is not set"
+##  fi
+##  
+##  if ${gl_progargs_d:-false} ; then
+##    echo "${gl_progargs_d_data}"
+##  else
+##    echo "d switch is not set"
+##  fi
+##  
+
+#[cf]
+##unset any variables prefexed with gl_progargs_
+unset ${!gl_progargs_*}
+
+##begin parsing command line
+for v_currentarg in "$@" ; do
+  if [[ -n "${v_currentarg}" && \
+        -z "${v_currentarg##-*}" && \
+        -n "${v_currentarg##-}" && \
+        -n "${v_currentarg##--*}" && \
+        -n "${v_currentarg##- *}" && \
+        -n "${v_currentarg##-? *}" ]] ; then
+    ##if current arg not empty and
+    ##  begins with a - and
+    ##  does not equal "-", "--", "- ", or "-? " then
+    ##  it is a switch
+    ##strip off leading -
+    v_currentarg="${v_currentarg#-}"
+    if [[ -n "${v_currentarg}" && -z "${v_currentarg##*=*}" ]] ; then
+      ##if current arg is a switch and has data --- split arg by switchname and data
+      v_currentdata="${v_currentarg#*=}"
+      v_currentarg="${v_currentarg%%=*}"
+      ##save switch data into the variable gl_progargs_{switchname}_data
+      eval gl_progargs_${v_currentarg}_data=\"\${v_currentdata}\"
+    fi
+    ##set switch state in gl_progargs_{switchname}=true
+    eval gl_progargs_${v_currentarg}=\"true\"
+    ##append switch into gl_progargs_switchlist
+    gl_progargs_switchlist="${gl_progargs_switchlist}${gl_progargs_switchlist:+ }${v_currentarg}"
+    gl_progargs_switchcount=$(( ${gl_progargs_switchcount:-0} + 1 ))
+  else
+    ##if current arg is data --- append data into the array gl_progargs_array
+    eval gl_progargs_array[${#gl_progargs_array[@]}]=\"\${v_currentarg}\"
+  fi
+done
+gl_progargs_datacount=${#gl_progargs_array[@]}
+unset v_currentarg
+unset v_currentdata
+#[cf]
+#[of]:resolve prefix
+gl_progpath=$(cd ${0%/*};pwd)
+if [[ -z "${gl_progpath%%*/packages}" ]] ; then
+  if [[ "${gl_progpath}" == "/packages" ]] ;then
+    prefix=""
+    v_dstdir=""
+  else
+    prefix="${gl_progpath%/packages}"
+    v_dstdir="${prefix}"
+  fi
+else
+  echo "linkit must exist in the packages directory."
+  exit 1
+fi
+#[cf]
+#[of]:report link forcing
+${gl_progargs_f:-false} && echo "link forcing is enabled"
+#[cf]
+#[of]:resolve full src path
+#v_srcdir=/basebuild/packages
+if [[ ! -d "${gl_progargs_array[0]}" ]] ; then
+  echo "src ${gl_progargs_array[0]} is not a directory"
+  exit 1
+fi
+v_srcdir=$(cd ${gl_progargs_array[0]} && pwd)
+echo ${v_srcdir}
+#[cf]
+
+
+IFS=$'\n'
+
+fn_recurse_base
+#ldconfig
+#[cf]

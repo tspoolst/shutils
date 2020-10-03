@@ -1,0 +1,33 @@
+#!/bin/bash
+
+
+lc_main_messagetime=3
+lc_main_windowpid=$(xprop | grep _NET_WM_PID | (read a a a;echo $a))
+if [[ -z "${lc_main_windowpid}" ]] ; then
+  echo "can not pause process
+no pid listed" | \
+  xmessage -center -timeout ${lc_main_messagetime} -file -
+  exit
+fi
+lc_main_windowprogname=$(ps ${lc_main_windowpid} | (read;read a a a a a b;echo ${a##*/}))
+
+#echo ${lc_main_windowpid} ${lc_main_windowprogname}
+for i in icewm fbpanel-2.2 ROX-Filer ; do
+  if [[ ${lc_main_windowprogname} = "${i}" ]] ; then
+    echo "can not pause process
+window manager component" | \
+    xmessage -center -timeout ${lc_main_messagetime} -file -
+    exit
+  fi
+done
+
+if kill -s STOP ${lc_main_windowpid} ; then
+  echo "${lc_main_windowprogname} has been paused
+  click ok or press enter to resume" | \
+    xmessage  -default okay -center -file -
+  kill -s CONT ${lc_main_windowpid}
+else
+  echo "can not pause ${lc_main_windowprogname}
+not owned by $(id -un)" | \
+  xmessage -center -timeout ${lc_main_messagetime} -file -
+fi

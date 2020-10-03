@@ -1,0 +1,5 @@
+#!/bin/bash
+
+date -s "1970-01-01 UTC $(ssh $@ 'date +%s') seconds"  && \
+  hwclock --systohc --utc
+

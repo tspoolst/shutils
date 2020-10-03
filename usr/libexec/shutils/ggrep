@@ -1,0 +1,5 @@
+#!/bin/bash
+
+v_searchfile="$1"
+shift
+exec grep "$@" "${v_searchfile}"

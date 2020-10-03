@@ -1,0 +1,19 @@
+#!/bin/bash
+
+if [[ ! -d "$1" ]] ; then
+  echo "usage: $0 dir"
+  echo "finds sparse and hardlinked files"
+  exit 1
+fi
+
+find $1 -xdev -type f -exec ls -lsk --time-style=long-iso {} \; | (
+  while read -a i ; do
+    if [[ ${i[0]} -lt ${i[5]} ]] ; then
+      echo "sparse   ${i[2]} ${i[0]} ${i[5]} ${i[8]}"
+    elif [[ ${i[2]} -gt 1 ]] ; then
+      echo "hardlink ${i[2]} ${i[0]} ${i[5]} ${i[8]}"
+    fi
+  done
+)
+
+exit 0

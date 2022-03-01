@@ -69,13 +69,13 @@ function fn_recurse_loop {
               ##if current dir is not etc|home or if force=true --- replace old link
               #echo "---Warning: ${v_dstdir}/${current} --- exists and is not from this package"
               #echo "link to ${v_srcdir}/${current}. Forcing link..."
-              rm -rf "${v_dstdir}/${current}"
               if [[ -L "${v_srcdir}/${current}" ]] ; then
 #[c]                echo cp1
-                cp -a "${v_srcdir}/${current}" "${v_dstdir}/${current}"
+                #rm -f "${v_dstdir}/${current}"
+                ln -sTf "$(readlink ${v_srcdir}/${current})" "${v_dstdir}/${current}"
               else
 #[c]                echo ln1
-                ln -sv "${v_srcdir#${prefix}}/${current}" "${v_dstdir}/${current}"
+                ln -sTf "${v_srcdir#${prefix}}/${current}" "${v_dstdir}/${current}"
               fi
             fi
           fi
@@ -87,7 +87,7 @@ function fn_recurse_loop {
             cp -a "${v_srcdir}/${current}" "${v_dstdir}/${current}"
           else
 #[c]            echo ln2
-            ln -sv "${v_srcdir#${prefix}}/${current}" "${v_dstdir}/${current}"
+            ln -sTf "${v_srcdir#${prefix}}/${current}" "${v_dstdir}/${current}"
           fi
         fi
       fi
@@ -217,6 +217,9 @@ echo ${v_srcdir}
 
 IFS=$'\n'
 
+#set -xv
+
 fn_recurse_base
 #ldconfig
 #[cf]
+# vim:number:tabstop=2:shiftwidth=2:autoindent:foldmethod=marker:foldlevel=0:foldmarker=#[of],#[cf]

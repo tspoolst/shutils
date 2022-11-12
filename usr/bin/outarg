@@ -988,20 +988,26 @@ function cleancat {
 
 #[c]1 reg 2 3 reg
 #[c]
+#[c]if first arg is not a number, it gets used as the seperator
+#[c]
 #[c]if arg is 0 output whole string
-#[c]if first arg is reg do reg on whole string
+#[c]if arg is > 0 output string part
+#[c]if next arg is reg also do reg on string part
 #[c]
 #[c][seperator|digit] [digit|reg] [digit|reg]
 #[c]
 #[c]outarg "" 2 "/#C/c" 4 "/#/-" 9 "##*]"
 #[c]
 
+#set -xv
+
 unset gl_args gl_seperator gl_output
 gl_IFS="${IFS}"
 aset gl_args "$@"
 
 if ! isnum "${gl_args[0]}" ; then
-  gl_seperator="${gl_args[0]}"
+  #gl_seperator="${gl_args[0]}"
+  ashift gl_seperator gl_args
 else
   gl_seperator="${gl_IFS}"
 fi
@@ -1025,8 +1031,9 @@ while ashift gl_currentArg gl_args ; do
   fi
 done
 
+IFS="${gl_seperator}"
 while read -ra i ; do
-  IFS="${gl_seperator}"
   eval "echo \"${gl_output[*]}\""
-  IFS="${gl_IFS}"
+  #echo "${gl_output[@]}"
+  #echo "${i[0]} _ ${i[2]}"
 done

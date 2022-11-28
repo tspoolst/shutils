@@ -1,51 +1,61 @@
 #!/bin/bash
-#ver 051205
-
-search_base="./"
-
-while [ -n "$1" ] ; do
+#ver 221125
+#[of]:setup vars
+#clean out env
+unset ${!lc_*}
+lc_searchPath="./"
+#[cf]
+#[of]:parse command line
+while [[ -n "$1" ]] ; do
   case "$1" in
-    "-?" | "--help")
-      echo "some help is always nice, but for now read the code."
-      ;;
-    "-x")
-      extra_ops="-xdev"
-      ;;
-    "-f")
-      shift
-      if [ -z "$1" ] ; then
-        echo "-f must be followed by a filter keyword"
-        exit 1
-      else
-        echo "grep filtering not enabled yet"
-        exit 1
-      fi
-      ;;
     -e)
       echo "exec switch not supported yes"
       exit 1
       ;;
+    "-f")
+      shift
+      if [ -z "$1" ] ; then
+        echo "-f must be followed by a grep compatible filter in quotes switches can be included"
+        exit 1
+      else
+        #need to figure out how to escape and the eval it
+        lc_filter="grep --color $1"
+      fi
+      ;;
+    "-i")
+      echo "using case sensitive search" >&2
+      lc_switchCase="-name"
+      ;;
+    "-x")
+      lc_switchArgs=("${lc_switchArgs[@]}" "-xdev")
+      ;;
+    "-?" | "--help")
+      echo "some help is always nice, but for now read the code."
+      ;;
     -*)
-      echo "the \"$1\" argment is not implemented yet."
+      echo "the \"$1\" switch is not implemented yet."
       exit 1
       ;;
     *)
-      search_arg="${search_arg}${search_arg:+ }$1"
+      lc_searchArgs=("${lc_searchArgs[@]}" "$1")
       ;;
   esac
   shift
 done
-if [ -z "$search_arg" ] ; then
+#[cf]
+#[of]:main
+if [[ "${#lc_searchArgs[@]}" == 0 ]] ; then
   echo "what, you're not looking for anything?"
 else
-  for arg in $search_arg
-  do
-    if [[ -d "${arg}" ]] ; then
-      search_base="${arg}"
+  for i in "${lc_searchArgs[@]}" ; do
+    if [[ -d "${i}" ]] ; then
+      lc_searchPath="${i}"
       continue
     fi
-    find ${search_base} ${extra_ops} -iname "*${arg}*" 2>/dev/null
+    find "${lc_searchPath}" "${lc_switchArgs[@]}" ${lc_switchCase:--iname} "*${i}*" 2>/dev/null | eval "${lc_filter:-cat}"
   done
 fi
 
 exit 0
+#[cf]
+# vim:number:tabstop=2:shiftwidth=2:autoindent:foldmethod=marker:foldlevel=0:foldmarker=#[of],#[cf]

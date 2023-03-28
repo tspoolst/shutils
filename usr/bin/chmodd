@@ -1,11 +1,1 @@
-#!/bin/bash
-
-#set -xv
-
-#take input and only chmod dirs
-_perms="$1"
-shift
-
-for _arg ; do
-  find ${_arg} -type d -exec chmod ${_perms} {} -c \;
-done
+chmodn

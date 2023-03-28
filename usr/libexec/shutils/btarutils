@@ -4,16 +4,16 @@
 function decompress () {
 	for arg
 	do
-      if [[ ! -r "${arg}" ]] ; then
-        echo "file ${arg} not found."
-        exit 1
-      fi
+    if [[ ! -r "${arg}" ]] ; then
+      echo "file ${arg} not found."
+      exit 1
+    fi
 
     lc_main_lcsrc="`echo ${arg} | tr A-Z a-z`"
     lc_main_ext="${lc_main_lcsrc##*.}"
     [[ -z "${lc_main_lcsrc%%*.tar.${lc_main_ext}}" ]] && lc_main_ext="tar.${lc_main_ext}"
 
-		case "$lc_main_ext" in
+    case "$lc_main_ext" in
       7z)
 	      7za x "$arg"
 	      ;;
@@ -21,7 +21,7 @@ function decompress () {
 	      unace x "$arg"
 	      ;;
       arj)
-        arj x -y -2o2 "${arg}"
+        arj x -v -y -2o2 "${arg}"
         ;;
       cfs|cromfs)
         unmkcromfs "${arg}"
@@ -36,6 +36,10 @@ function decompress () {
         dar -w -v -x "${src%.1.dar}"
         [[ -L "${src}" ]] && rm -f "${src}"
         ;;
+      deb)
+        dst="${arg##*/}"
+        dpkg-deb -xv "${arg}" ./"${dst%.deb}"
+        ;;
       rar)
 	      rar x -ow "$arg"
 	      ;;
@@ -43,7 +47,7 @@ function decompress () {
 #[of]:         dorpm
   if which rpm2cpio > /dev/null 2>&1 ; then
     rpm2cpio "$arg" | cpio -v --extract --preserve-modification-time --make-directories 
-    if [ ! $? = 0 ]; then
+    if [[ ! $? = 0 ]] ; then
       echo "... rpm2cpio failed.  (maybe $i is not an RPM?)"
     fi
   else # less reliable than rpm2cpio...
@@ -84,7 +88,10 @@ function decompress () {
 			unzip -X "$arg"
 			;;
 		*)
-			echo "file $arg is not an ace, bzip, gzip, rar, rpm, or zip"
+		  _ranges=( $(declare -f decompress | grep -nEe '^[[:blank:]]+case' -e '^[[:blank:]]+esac' | grep -oE '^[^:]+') )
+		  _extensions=( $(declare -f decompress | tail -n +$((${_ranges[0]}+1)) | head -n $((${_ranges[1]}-${_ranges[0]}-1)) | grep -oP '[[:blank:]]*\K[^\)]+(?=\)( |$))' | tr ' | ' ' ' | grep -v '*') )
+		  printf -v _extensions '%s, ' $(echo ${_extensions[@]} | sort)
+			echo "file $arg is not ${_extensions%, }"
 			;;
 		esac
 	done
@@ -96,11 +103,11 @@ function compress () {
   shift
   local srcarray=( "$@" )
 
-	#echo dst $dst
+	#echo dst "${dst}"
 	#echo src $src
 	#for arg in $@
 	#do
-  lc_main_lcdst="`echo $dst | tr A-Z a-z`"
+  lc_main_lcdst="`echo "${dst}" | tr A-Z a-z`"
   lc_main_ext="${lc_main_lcdst##*.}"
   [[ -z "${lc_main_lcdst%%*.tar.${lc_main_ext}}" ]] && lc_main_ext="tar.${lc_main_ext}"
 
@@ -117,22 +124,22 @@ function compress () {
   #this should be built up like a regular copy command if possible
   7z)
 	  #compression -6 is default, -9 is max
-	  [ -e $dst ] && rm -f $dst
-	  7za a -mx=9 $dst "${srcarray[@]}"
+	  [[ -e "${dst}" ]] && rm -f "${dst}"
+	  7za a -mx=9 "${dst}" "${srcarray[@]}"
 	  ;;
   ace)
 	  echo sorry ace compression is not yet supported
 	  #no known free compressor
-	  #unace x $dst $src
+	  #unace x "${dst}" $src
 	  ;;
   arj)
     #adding empty dirs is broke
     #saving ownership and permissions of base dirs is broke
-    [ -e $dst ] && rm -f $dst
+    [[ -e "${dst}" ]] && rm -f "${dst}"
     arj a "${dst}" -jm -r -2o2 -a1 "${srcarray[@]}"
     ;;
   cfs|cromfs)
-  set -xv
+    set -xv
     if [[ ! -d "${srcarray[0]}" ]] ; then
       echo "cromfs need a directory as input"
       exit 1
@@ -147,7 +154,7 @@ function compress () {
       srcarray[$i]="-g \"${srcarray[$i]}\""
       ((i++))
     done
-    eval dar -w -v -y9 -R $PWD "${srcarray[@]}" -c - > "$dst"
+    eval dar -w -v -y9 -R $PWD "${srcarray[@]}" -c - > "${dst}"
     ;;
   rar)
 	  #compression -m3 is default, -m5 is max
@@ -157,40 +164,40 @@ function compress () {
 	  #
 	  #-ow retain uid/gid - top level uid/gid is not stored
 	  #-ol retain links - links do not store uid/gid
-	  [ -e $dst ] && rm -f $dst
-	  rar a -m5 -r -ol -ow $dst "${srcarray[@]}"
+	  [[ -e "${dst}" ]] && rm -f "${dst}"
+	  rar a -m5 -r -ol -ow "${dst}" "${srcarray[@]}"
 	  ;;
   tar)
 	  #-C changes the src working directory
-	  tar cvSf $dst "${srcarray[@]}"
+	  tar cvSf "${dst}" "${srcarray[@]}"
 	  ;;
   tar.7z)
 	  #compression -6 is default, -9 is max
-	  [ -e $dst ] && rm -f $dst
-	  tar cvS "${srcarray[@]}" | 7za a -mx=9 -si $dst
+	  [[ -e "${dst}" ]] && rm -f "${dst}"
+	  tar cvS "${srcarray[@]}" | 7za a -mx=9 -si "${dst}"
 	  ;;
   tar.bz2)
 	  #compression -9 is max and default
-	  tar cvS "${srcarray[@]}" | bzip2 -9 > $dst
+	  tar cvS "${srcarray[@]}" | bzip2 -9 > "${dst}"
 	  ;;
   tar.gz | tgz)
 	  #compression -6 is default, -9 is max
-	  tar cvS "${srcarray[@]}" | gzip -9 > $dst
+	  tar cvS "${srcarray[@]}" | gzip -9 > "${dst}"
 	  ;;
   tar.lzma)
-	  tar cvS "${srcarray[@]}" | lzma -z9c > "$dst"
+	  tar cvS "${srcarray[@]}" | lzma -z9c > "${dst}"
 	  ;;
   tar.xz)
 	  #compression -9 is max and default
-	  tar cvS "${srcarray[@]}" | xz -z9c > $dst
+	  tar cvS "${srcarray[@]}" | xz -z9c > "${dst}"
 	  ;;
   zip)
 	  #compression -6 is default, -9 is max
 	  #-y retain links
-	  zip -ry9 - "${srcarray[@]}" > $dst
+	  zip -ry9 - "${srcarray[@]}" > "${dst}"
 	  ;;
   *)
-	  echo "file $dst is not a bzip, gzip, zip, or rar"
+	  echo "file ${dst} is not a bzip, gzip, zip, or rar"
 	  ;;
   esac
   #done
@@ -211,16 +218,16 @@ function conversion () {
 	#rpm to etc
 	#tar.bz2 to .zip or tar.gz or rar  etc
 	echo
-	zip -ry9 - $src > $dst
+	zip -ry9 - $src > "${dst}"
 }
 #[cf]
 
 #we need command line checking before we call other functions
 #confermations would be nice before we destroy existing archives
 #a generic help system needs to be made
-if [ "${0##*/}" == "utar" ] ; then
+if [[ "${0##*/}" == "utar" ]] ; then
 	decompress "$@"
-elif [ "${0##*/}" == "ctar" ] ; then
+elif [[ "${0##*/}" == "ctar" ]] ; then
 	compress "$@"
 else
 	echo "this program must be ran as a link named ctar or utar"

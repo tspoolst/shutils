@@ -1,0 +1,31 @@
+#!/bin/bash
+
+function fn_doChmod {
+  typeset lc_type lc_perms
+  lc_type="$1"
+  shift
+  lc_perms="$1"
+  shift
+  for _arg ; do
+    find "${_arg}" -type ${lc_type} -exec chmod "${lc_perms}" "{}" -c \;
+  done
+}
+
+#set -xv
+
+
+if [[ "${0##*/}" == "chmodd" ]] ; then
+  gl_perms="$1"
+  shift
+  #take input and only chmod dirs
+	fn_doChmod d "${gl_perms}" "$@"
+elif [[ "${0##*/}" == "chmodf" ]] ; then
+  gl_perms="$1"
+  shift
+  #take input and only chmod files
+	fn_doChmod f "${gl_perms}" "$@"
+else
+	fn_doChmod d 755 "$@"
+	fn_doChmod f 644 "$@"
+fi
+

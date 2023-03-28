@@ -1,9 +1,9 @@
 #!/bin/bash
-#ver 221125
+#ver 230328
 #[of]:setup vars
+search_base="./"
 #clean out env
-unset ${!lc_*}
-lc_searchPath="./"
+unset extra_ops search_args
 #[cf]
 #[of]:parse command line
 while [[ -n "$1" ]] ; do
@@ -37,22 +37,23 @@ while [[ -n "$1" ]] ; do
       exit 1
       ;;
     *)
-      lc_searchArgs=("${lc_searchArgs[@]}" "$1")
+      search_args[${#search_args[@]}]="$1"
       ;;
   esac
   shift
 done
 #[cf]
 #[of]:main
-if [[ "${#lc_searchArgs[@]}" == 0 ]] ; then
+if [[ ${#search_args[@]} == 0 ]] ; then
   echo "what, you're not looking for anything?"
 else
-  for i in "${lc_searchArgs[@]}" ; do
-    if [[ -d "${i}" ]] ; then
-      lc_searchPath="${i}"
+  for arg in "${search_args[@]}"
+  do
+    if [[ -d "${arg}" ]] ; then
+      search_base="${arg}"
       continue
     fi
-    find "${lc_searchPath}" "${lc_switchArgs[@]}" ${lc_switchCase:--iname} "*${i}*" 2>/dev/null | eval "${lc_filter:-cat}"
+    find "${search_base}" ${extra_ops} -iname "*${arg}*" 2>/dev/null
   done
 fi
 

@@ -1,9 +1,10 @@
 #!/bin/bash
-#ver 230328
+#ver 230405
 #[of]:setup vars
 search_base="./"
 #clean out env
 unset extra_ops search_args
+lc_switchCase="-iname"
 #[cf]
 #[of]:parse command line
 while [[ -n "$1" ]] ; do
@@ -27,10 +28,11 @@ while [[ -n "$1" ]] ; do
       lc_switchCase="-name"
       ;;
     "-x")
-      lc_switchArgs=("${lc_switchArgs[@]}" "-xdev")
+      extra_ops=("${extra_ops[@]}" "-xdev")
       ;;
     "-?" | "--help")
       echo "some help is always nice, but for now read the code."
+      exit 0
       ;;
     -*)
       echo "the \"$1\" switch is not implemented yet."
@@ -53,7 +55,7 @@ else
       search_base="${arg}"
       continue
     fi
-    find "${search_base}" ${extra_ops} -iname "*${arg}*" 2>/dev/null
+    find "${search_base}" ${extra_ops} ${lc_switchCase} "*${arg}*" 2>/dev/null
   done
 fi
 

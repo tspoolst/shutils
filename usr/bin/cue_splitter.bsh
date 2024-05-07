@@ -1,0 +1,191 @@
+#!/bin/bash
+
+#[of]:functions
+#[of]:cleancat() {
+cleancat() {
+#[of]:  usage
+  if [ $# -gt 1 ] ; then
+    echo "Usage: cleancat [filename]|[redirect]"
+    echo "Error: must have 0 or 1 argument"
+    echo "Description: dumps a file or pipe removing blank lines and comments"
+    echo "Examples:"
+    echo '  cleancat ${lc_main_filename}'
+    echo '  bigdataapp | cleancat'
+    echo '  cleancat < echo "A Test String"'
+    echo "Returns:"
+    echo "  0 success"
+    exit 1
+  fi
+#[cf]
+  if [[ -n "$1" ]] ; then
+    [[ ! -r "$1" ]] && die 1 "could not read file $1"
+    grep -v -e "^[[:blank:]]*$" -e "^[[:blank:]]*#" "$1" 2>/dev/null
+  else
+    grep -v -e "^[[:blank:]]*$" -e "^[[:blank:]]*#" 2>/dev/null
+  fi
+}
+#[cf]
+#[of]:function isnum {
+function isnum {
+#[of]:  usage
+  if false ; then
+    echo "Usage: isnum arg"
+    echo "Error: must have at least 1 argument"
+    echo "Description: checks if arg is a number"
+    echo "Examples:"
+    echo '  "if isnum 50 ; then'
+    echo '    echo is a number'
+    echo '  else'
+    echo '    echo is not a number'
+    echo '  fi"'
+    echo '  statement may also be negated'
+    echo '    "if ! isnum 50 ; then"'
+    echo "Returns:"
+    echo "  0 true"
+    echo "  1 false"
+    exit 1
+  fi
+#[cf]
+  #set IFS to a sane value
+  typeset IFS=' 	
+'
+  if [[ "$1" == ?(+|-)+([0-9]) ]] ; then
+   return 0
+  fi
+  return 1
+}
+#[cf]
+#[of]:function hms_to_s {
+function hms_to_s {
+  typeset lc_hms IFS
+  IFS="${gl_IFS}"
+  lc_hms=( ${1//[:\.]/ } )
+  echo $(( ((10#${lc_hms[0]} * 60 + 10#${lc_hms[1]}) * 60 + 10#${lc_hms[2]}) * 1000 +10#$(printf '%s%0'$((4-${#lc_hms[3]}))'d\n' ${lc_hms[3]} 0)/10 ))
+}
+#[cf]
+#[of]:function s_to_hms {
+function s_to_hms {
+  typeset IFS
+  IFS="${gl_IFS}"
+  if ! isnum "$1" || [[ ${1:-0} == 0 ]] ; then
+    echo "00:00:00.000"
+  else
+    printf '%02d:%02d:%02d.%03d\n' $((${1}/1000/60/60)) $((${1}/1000/60-(${1}/1000/60/60*60))) $((${1}/1000-${1}/1000/60*60)) $((${1}-${1}/1000*1000))
+  fi
+}
+#[cf]
+#[cf]
+#[of]:setup vars
+gl_IFS="${IFS}"
+
+declare -A gl_songInfo
+unset ${!tracks_*}
+fileAudioInput="None"
+tracksTotal=0
+
+#[of]:defaults
+gl_bitrate=128
+gl_compression='-ab ${gl_bitrate}k -id3v2_version 3'
+gl_outputExtension="mp3"
+#[cf]
+#[cf]
+#[of]:main
+set -xv
+#[of]:parse command line
+while [[ -n "$1" ]] ; do
+  case "$1" in
+    -m4a)
+      gl_compression='-af aresample=resampler=soxr -ar 44100 -c:a aac -b:a ${gl_bitrate}k'
+      gl_outputExtension="m4a"
+      ;;
+    -mp3)
+      #mp3 is the default
+      ;;
+    -flac)
+      gl_compression='-c copy'
+      gl_outputExtension="flac"
+      ;;
+    -br)
+      shift
+      gl_bitrate="$1"
+      ;;
+    -h)
+      echo 'output formats "[-m4a|-mp3|-flac]"'
+      echo 'set bitrate "[-br 128]"'
+      echo "usage $0 -br 128 -mp3 inputfile.cue"
+      ;;
+    *)
+      cue_file="$1"
+      ;;
+  esac
+  shift
+done
+[[ -z "${cue_file}" ]] && cue_file=$(ls *.cue | head -n 1)
+if [[ -z "${cue_file}" ]] ; then
+  echo "no .cue file found at current location"
+  exit 1
+fi
+#[cf]
+#[of]:read cue file
+IFS=$'\n'
+while read -r d ; do
+  if [[ -n "${d}" ]] ; then
+    case "$d" in
+      "REM GENRE "*)
+        gl_songInfo['genre']="${d#REM GENRE }"
+        ;;
+      "REM DATE "*)
+        gl_songInfo['date']="${d#REM DATE }"
+        ;;
+      "PERFORMER "*)
+        d="${d#PERFORMER }"
+        gl_songInfo['artist']="${d//\"/}"
+        ;;
+      "TITLE "*)
+        d="${d#TITLE }"
+        gl_songInfo['album']="${d//\"/}"
+        ;;
+      "FILE "*)
+        d=${d#*\"}
+        fileAudioInput=${d%%\"*}
+        ;;
+      "  TRACK "*)
+        ((tracksTotal++))
+        ;;
+      "    TITLE "*)
+        d="${d#    TITLE }"
+        eval "tracks_${tracksTotal}[0]=\"\${d//\\\"/}\""
+        ;;
+      "    INDEX 01 "*)
+        d="${d#    INDEX 01 }"
+        d="$(hms_to_s 00:${d})"
+        eval "tracks_${tracksTotal}[1]=\"\${d}\""
+        ;;
+    esac
+  fi
+done < <(cat "${cue_file}" | dos2unix)
+IFS="${gl_IFS}"
+#[cf]
+#[of]:process each track
+for ((i=1;i<=tracksTotal;i++)) ; do
+  eval track_start=\"\${tracks_${i}[1]}\""
+  eval track_length=\"\${tracks_$((i+1))[1]}\""
+  [[ -n "${track_length}" ]] && track_length=$(s_to_hms $((track_length-track_start)))
+  track_start=$(s_to_hms ${track_start})
+
+  eval "gl_songInfo[\"title\"]=\"\${tracks_${i}[0]}\""
+  gl_songInfo["track"]=$(printf %0${#tracksTotal}d ${i})
+  metadata=$(for a in ${!gl_songInfo[@]} ; do
+              echo -n "-metadata ${a}='${gl_songInfo[${a}]}' "
+            done)
+
+  eval "ffmpeg \
+    -i \"${fileAudioInput}\" \
+    ${metadata} \
+    ${track_start:+-ss ${track_start}} ${track_length:+-t ${track_length}} \
+    -map 0:a \
+    ${gl_compression} \
+    \"${gl_songInfo["artist"]}-${gl_songInfo["track"]}-${gl_songInfo["title"]}.${gl_outputExtension}\""
+done
+#[cf]
+#[cf]

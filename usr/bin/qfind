@@ -1,10 +1,8 @@
 #!/bin/bash
-#ver 230405
 #[of]:setup vars
 search_base="./"
 #clean out env
-unset extra_ops search_args
-lc_switchCase="-iname"
+unset extra_ops search_args gl_filter gl_fileType gl_switchCase
 #[cf]
 #[of]:parse command line
 while [[ -n "$1" ]] ; do
@@ -16,16 +14,23 @@ while [[ -n "$1" ]] ; do
     "-f")
       shift
       if [ -z "$1" ] ; then
-        echo "-f must be followed by a grep compatible filter in quotes switches can be included"
+        echo "-f must be followed by a grep compatible filter in quotes. (switches can be included too)"
+        echo "  can be specified as many times as you like"
+        echo "i.e."
+        echo "  -f \"-P '(this|or that)'\" -f \"then match by this\""
         exit 1
       else
-        #need to figure out how to escape and the eval it
-        lc_filter="grep --color $1"
+        gl_filter[${#gl_filter[@]}]="$1"
       fi
       ;;
     "-i")
-      echo "using case sensitive search" >&2
-      lc_switchCase="-name"
+      #echo "using case sensitive search" >&2
+      gl_switchCase="-name"
+      ;;
+    "-t")
+      shift
+      #echo "searching for files of type $1" >&2
+      gl_fileType="-type $1"
       ;;
     "-x")
       extra_ops=("${extra_ops[@]}" "-xdev")
@@ -48,15 +53,19 @@ done
 #[of]:main
 if [[ ${#search_args[@]} == 0 ]] ; then
   echo "what, you're not looking for anything?"
+  exit 1
+fi
+
+for arg in "${search_args[@]}" ; do
+  if [[ "${arg}" != "." && -d "${arg}" ]] ; then
+    search_base="${arg}"
+    continue
+  fi
+  find "${search_base}" ${extra_ops} ${gl_fileType} ${gl_switchCase:--iname} "*${arg}*" 2>/dev/null
+done | if ((${#gl_filter[@]})) ; then
+  eval "cat ${gl_filter[@]/#/| grep --color }"
 else
-  for arg in "${search_args[@]}"
-  do
-    if [[ -d "${arg}" ]] ; then
-      search_base="${arg}"
-      continue
-    fi
-    find "${search_base}" ${extra_ops} ${lc_switchCase} "*${arg}*" 2>/dev/null
-  done
+  cat
 fi
 
 exit 0

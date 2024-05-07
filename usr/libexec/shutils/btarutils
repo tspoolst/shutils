@@ -2,6 +2,11 @@
 
 #[of]:function decompress
 function decompress () {
+  if [[ $# == 0 ]] ; then
+    echo "decompress extensions can be "$(declare -f ${FUNCNAME[0]} | grep -oP '^[[:blank:]]*\K.*(?=\)$)' | sed -e 's% %%g;s%|% %g;s% %\n%g' | grep -v '*' | sort)""
+    exit
+  fi
+
 	for arg
 	do
     if [[ ! -r "${arg}" ]] ; then
@@ -53,16 +58,11 @@ function decompress () {
   else # less reliable than rpm2cpio...
     size=( `ls -l "$arg"` )
     size=${size[4]}
-    tag="`echo -e "\037\213\010"`"
-    i=0
-    while [[ $i -lt ${size} ]] ; do
-      cval="`dd if="$arg" bs=1 skip=$i count=3 2>/dev/null`"
-      if [[ "${tag}" = "${cval}" ]] ; then
-        dd ibs=$i skip=1 if="$arg" 2> /dev/null | gzip -dc | cpio -v --extract --preserve-modification-time --make-directories
-        exit 0
-      fi
-      ((i++))
-    done
+    gl_offset=$((LANG=C grep -obUaP "\x1f\x8b\x08" ${arg}) | grep -oPm 1 '^[[:digit:]]+')
+    if [[ -n "${gl_offset}" ]] ; then
+      dd ibs=${gl_offset} skip=1 if="${arg}" 2> /dev/null | gzip -dc | cpio -v --extract --preserve-modification-time --make-directories
+      exit 0
+    fi
   fi
 #[cf]
 			;;
@@ -84,21 +84,26 @@ function decompress () {
       tar.xz)
 	      xz -dc "$arg" | tar xSv
 	      ;;
-		zip|exe)
-			unzip -X "$arg"
-			;;
-		*)
-		  _ranges=( $(declare -f decompress | grep -nEe '^[[:blank:]]+case' -e '^[[:blank:]]+esac' | grep -oE '^[^:]+') )
-		  _extensions=( $(declare -f decompress | tail -n +$((${_ranges[0]}+1)) | head -n $((${_ranges[1]}-${_ranges[0]}-1)) | grep -oP '[[:blank:]]*\K[^\)]+(?=\)( |$))' | tr ' | ' ' ' | grep -v '*') )
-		  printf -v _extensions '%s, ' $(echo ${_extensions[@]} | sort)
-			echo "file $arg is not ${_extensions%, }"
-			;;
-		esac
-	done
+      tar.zst)
+	      zstd -dc "$arg" | tar xSv
+	      ;;
+      zip|exe)
+        unzip -X "$arg"
+        ;;
+      *)
+        echo "file $arg is not "$(declare -f ${FUNCNAME[0]} | grep -oP '^[[:blank:]]*\K.*(?=\)$)' | sed -e 's% %%g;s%|% %g;s% %\n%g' | grep -v '*' | sort)""
+        ;;
+    esac
+  done
 }
 #[cf]
 #[of]:function compress
 function compress () {
+  if [[ $# == 0 ]] ; then
+    echo "compress extensions can be "$(declare -f ${FUNCNAME[0]} | grep -oP '^[[:blank:]]*\K.*(?=\)$)' | sed -e 's% %%g;s%|% %g;s% %\n%g' | grep -v '*' | sort)""
+    exit
+  fi
+
   local dst="$1"
   shift
   local srcarray=( "$@" )
@@ -191,13 +196,17 @@ function compress () {
 	  #compression -9 is max and default
 	  tar cvS "${srcarray[@]}" | xz -z9c > "${dst}"
 	  ;;
+  tar.zst)
+	  #compression -3 is default, -22 is max
+	  tar cvS "${srcarray[@]}" | zstd --ultra -22 "${dst}"
+	  ;;
   zip)
 	  #compression -6 is default, -9 is max
 	  #-y retain links
 	  zip -ry9 - "${srcarray[@]}" > "${dst}"
 	  ;;
   *)
-	  echo "file ${dst} is not a bzip, gzip, zip, or rar"
+    echo "file ${dst} is not "$(declare -f ${FUNCNAME[0]} | grep -oP '^[[:blank:]]*\K.*(?=\)$)' | sed -e 's% %%g;s%|% %g;s% %\n%g' | grep -v '*' | sort)""
 	  ;;
   esac
   #done

@@ -1,0 +1,34 @@
+#!/bin/bash
+
+#set -xv
+
+while [[ -n "$1" ]] ; do
+  if [[ -z "${1##${HOME}/mnt/*}" && -d "$1" ]] ; then
+    ##strip off homedir path
+    _remotehost="${1#${HOME}/mnt/}"
+    ##save remote path
+    if [[ -z "${_remotehost##*/*}" ]]  ; then
+      _path="/${_remotehost#*/}"
+    else
+      _path="/"
+    fi
+    ##save remote host
+    _remotehost="${_remotehost%%/*}"
+    if [[ -z "${_remotehost%%*home}" ]] ; then
+      ##if host ends with home then the base start dir is the users home dir
+      _remotehost="${_remotehost%home}"
+      _path="${HOME}/${_path}"
+    fi
+    _remotehost="${_remotehost%rw}"
+    ssh -o Batchmode=yes "${_remotehost}" "
+      [[ -s \".profile\" ]] && { grep -q \". .rhere\" .profile || echo \". .rhere\" >> .profile ; }
+      [[ -s \".bashrc\" ]] && { grep -q \". .rhere\" .bashrc || echo \". .rhere\" >> .bashrc ; }
+      echo \"
+        cd ${_path}
+        : > ~/.rhere
+      \" > .rhere" &&
+      x-terminal-emulator -ls -e ssh "${_remotehost}" &
+    #exec urxvt -tn rxvt -tr -sh 20 -g 80x24 -bg black -cr green -fg white -C -fn 7x14 -sl 5000 -e ssh $1 &
+    shift
+  fi
+done

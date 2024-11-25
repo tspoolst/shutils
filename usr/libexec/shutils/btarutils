@@ -45,6 +45,9 @@ function decompress () {
         dst="${arg##*/}"
         dpkg-deb -xv "${arg}" ./"${dst%.deb}"
         ;;
+      lzh)
+	      7z x "$arg"
+	      ;;
       rar)
 	      rar x -ow "$arg"
 	      ;;
